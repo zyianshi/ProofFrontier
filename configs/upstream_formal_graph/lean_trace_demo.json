@@ -1,0 +1,29 @@
+{
+  "theorem_id": "lean_demo_sub_pos",
+  "imports": ["Mathlib"],
+  "theorem_context": ["{a b : Real}"],
+  "target": {
+    "id": "T",
+    "statement": "a^2 - b^2 > 0",
+    "lean_statement": "a ^ 2 - b ^ 2 > 0",
+    "metadata": {
+      "proof_completion": "nlinarith [sq_nonneg (a + b), sq_nonneg (a - b)]"
+    }
+  },
+  "premises": [
+    {"id": "P1", "statement": "a > b", "lean_statement": "a > b"},
+    {"id": "P2", "statement": "b > 0", "lean_statement": "b > 0"}
+  ],
+  "lemmas": [
+    {"id": "L1", "statement": "a - b > 0", "lean_statement": "a - b > 0", "depends_on": ["P1"], "difficulty": 0.6},
+    {
+      "id": "L2",
+      "statement": "a^2 - b^2 = (a-b)(a+b)",
+      "lean_statement": "a ^ 2 - b ^ 2 = (a - b) * (a + b)",
+      "depends_on": ["P1"],
+      "difficulty": 0.7
+    },
+    {"id": "L3", "statement": "a + b > 0", "lean_statement": "a + b > 0", "depends_on": ["P2"], "difficulty": 0.5}
+  ],
+  "target_depends_on": ["L1", "L2", "L3"]
+}

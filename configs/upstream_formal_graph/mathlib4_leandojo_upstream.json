@@ -1,0 +1,22 @@
+﻿{
+    "wsl_user":  "xuanxuan_awe",
+    "wsl_project_root":  "/home/xuanxuan_awe/GenAI",
+    "repo_url":  "https://github.com/leanprover-community/mathlib4",
+    "commit":  "c211948581bde9846a99e32d97a03f0d5307c31e",
+    "local_repo_path":  "",
+    "traced_repo_root":  "artifacts/upstream_formal_graph/mathlib4_v420_traced",
+    "inventory_jsonl":  "artifacts/upstream_formal_graph/mathlib4_v420_traced_theorems.jsonl",
+    "graph_out_dir":  "artifacts/upstream_formal_graph/mathlib4_v420_taam_graphs",
+    "module_prefixes":  [
+                            "Mathlib.Algebra"
+                        ],
+    "allow_non_tactic":  false,
+    "min_tactics":  1,
+    "limit":  100,
+    "max_depth":  2,
+    "max_nodes":  128,
+    "load_existing":  false,
+    "no_build_deps":  false,
+    "timeout_sec":  14400,
+    "wsl_python_bin":  "/home/xuanxuan_awe/miniconda3/envs/work/bin/python"
+}

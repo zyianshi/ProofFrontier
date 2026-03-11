@@ -1,0 +1,56 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Local package / installer caches
+pip-wheel-metadata/
+
+# Lean / Lake build products
+.lake/
+*.olean
+*.ilean
+*.trace
+*.hash
+*.c
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+
+# Local helper project outputs
+lean_project/.lake/
+lean_project/build/
+lean_project/.cache/
+
+# Generated experiment artifacts
+artifacts/
+
+# Legacy temporary directories / files
+.empty/
+*.log
+tmp_*
+
+# Local machine notes
+*.tmp
+*.bak

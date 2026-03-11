@@ -1,0 +1,33 @@
+{
+  "name": "downstream_sft_minif2f",
+  "out_dir": "artifacts/downstream_prover_eval/downstream_sft_minif2f",
+  "dataset": {
+    "samples_root": "artifacts/midstream_taam_generation/sweeps",
+    "sample_glob": "**/*_hard_sample.json",
+    "format": "sft",
+    "only_well_posed": true,
+    "require_proof_completion": true,
+    "train_ratio": 0.8,
+    "val_ratio": 0.1,
+    "test_ratio": 0.1,
+    "seed": 7
+  },
+  "training": {
+    "enabled": true,
+    "mode": "sft",
+    "base_model": "deepseek-ai/DeepSeek-Prover-V2-7B",
+    "output_model_dir": "artifacts/downstream_prover_eval/downstream_sft_minif2f/model",
+    "command_template": "python tools/mock_train_prover.py --train-jsonl \"{train_jsonl}\" --eval-jsonl \"{eval_jsonl}\" --test-jsonl \"{test_jsonl}\" --output-model-dir \"{output_model_dir}\" --result-json \"{result_json}\" --base-model \"{base_model}\" --mode \"{mode}\"",
+    "timeout_sec": 600
+  },
+  "benchmark": {
+    "enabled": true,
+    "dataset_name": "miniF2F",
+    "split": "test",
+    "base_model_ref": "deepseek-ai/DeepSeek-Prover-V2-7B",
+    "tuned_model_ref": "",
+    "base_command_template": "python tools/mock_benchmark_eval.py --model-ref \"{model_ref}\" --benchmark-name \"{benchmark_name}\" --split \"{split}\" --out-json \"{out_json}\"",
+    "tuned_command_template": "python tools/mock_benchmark_eval.py --model-ref \"{model_ref}\" --benchmark-name \"{benchmark_name}\" --split \"{split}\" --out-json \"{out_json}\"",
+    "timeout_sec": 600
+  }
+}

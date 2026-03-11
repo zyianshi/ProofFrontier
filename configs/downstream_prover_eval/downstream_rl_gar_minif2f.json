@@ -1,0 +1,36 @@
+{
+  "name": "downstream_rl_gar_minif2f",
+  "out_dir": "artifacts/downstream_prover_eval/downstream_rl_gar_minif2f",
+  "dataset": {
+    "samples_root": "artifacts/midstream_taam_generation/sweeps",
+    "sample_glob": "**/*_hard_sample.json",
+    "format": "rl",
+    "only_well_posed": true,
+    "require_proof_completion": false,
+    "train_ratio": 0.8,
+    "val_ratio": 0.1,
+    "test_ratio": 0.1,
+    "seed": 7
+  },
+  "training": {
+    "enabled": true,
+    "mode": "rl",
+    "base_model": "deepseek-ai/DeepSeek-Prover-V2-7B",
+    "output_model_dir": "artifacts/downstream_prover_eval/downstream_rl_gar_minif2f/model",
+    "command_template": "python tools/mock_train_prover.py --train-jsonl \"{train_jsonl}\" --eval-jsonl \"{eval_jsonl}\" --test-jsonl \"{test_jsonl}\" --output-model-dir \"{output_model_dir}\" --result-json \"{result_json}\" --base-model \"{base_model}\" --mode \"{mode}\"",
+    "timeout_sec": 600
+  },
+  "benchmark": {
+    "enabled": true,
+    "dataset_name": "miniF2F",
+    "split": "test",
+    "data_path": "path/to/GAR-Official/data",
+    "manifest_path": "",
+    "task_limit": 0,
+    "base_model_ref": "deepseek-ai/DeepSeek-Prover-V2-7B",
+    "tuned_model_ref": "",
+    "base_command_template": "python tools/run_minif2f_benchmark.py --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --out-json \"{out_json}\" --timeout-sec 120 --command-template \"python tools/run_deepseek_prover.py --mock --lean-file \\\"{{lean_file}}\\\" --out-json \\\"{{result_json}}\\\"\"",
+    "tuned_command_template": "python tools/run_minif2f_benchmark.py --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --out-json \"{out_json}\" --timeout-sec 120 --command-template \"python tools/run_deepseek_prover.py --mock --lean-file \\\"{{lean_file}}\\\" --out-json \\\"{{result_json}}\\\"\"",
+    "timeout_sec": 3600
+  }
+}
