@@ -30,29 +30,29 @@ Current validated output:
 Use the current mainline environment only:
 - conda env: `work`
 - Lean toolchain: `v4.20.0`
-- active Mathlib worktree: `/home/xuanxuan_awe/deps/mathlib4_v420_user`
+- active Mathlib worktree: `./deps/mathlib4_v420_user`
 
 Required directories that should already exist after setup:
-- `/home/xuanxuan_awe/deps/mathlib4`
-- `/home/xuanxuan_awe/deps/mathlib4_v420_user`
-- `/home/xuanxuan_awe/.elan`
-- `/home/xuanxuan_awe/.local/taam_work_pkgs`
+- `./deps/mathlib4`
+- `./deps/mathlib4_v420_user`
+- `./.elan`
+- `./.local/taam_work_pkgs`
 
 ## 1. Enter WSL and activate the environment
 From PowerShell:
 
 ```powershell
-wsl -u xuanxuan_awe
+wsl -u <your wsl>
 ```
 
 Then in WSL:
 
 ```bash
-cd /home/xuanxuan_awe/GenAI
+cd ./GenAI
 source "$HOME/.elan/env"
-source /home/xuanxuan_awe/miniconda3/etc/profile.d/conda.sh
+source ./miniconda3/etc/profile.d/conda.sh
 conda activate work
-export TAAM_WORK_PKGS=/home/xuanxuan_awe/.local/taam_work_pkgs
+export TAAM_WORK_PKGS=./.local/taam_work_pkgs
 export PYTHONPATH="$TAAM_WORK_PKGS:${PYTHONPATH:-}"
 ```
 
@@ -74,22 +74,22 @@ bash tools/install_leandojo_work_userpkgs.sh
 ```
 
 This does **not** use a venv. It installs LeanDojo into:
-- `/home/xuanxuan_awe/.local/taam_work_pkgs`
+- `./.local/taam_work_pkgs`
 
 ## 3. Prepare the Mathlib4 worktree
 Current working tree for the validated upstream:
-- `/home/xuanxuan_awe/deps/mathlib4_v420_user`
+- `./deps/mathlib4_v420_user`
 
 If it is missing, recreate it from the main repo:
 
 ```bash
-git -C /home/xuanxuan_awe/deps/mathlib4 worktree add --detach /home/xuanxuan_awe/deps/mathlib4_v420_user c211948581bde9846a99e32d97a03f0d5307c31e
+git -C ./deps/mathlib4 worktree add --detach ./deps/mathlib4_v420_user c211948581bde9846a99e32d97a03f0d5307c31e
 ```
 
 Then populate the cache:
 
 ```bash
-cd /home/xuanxuan_awe/deps/mathlib4_v420_user
+cd ./deps/mathlib4_v420_user
 source "$HOME/.elan/env"
 lake exe cache get
 ```
@@ -98,20 +98,20 @@ lake exe cache get
 This is the path that has already been verified in this repository.
 
 ```bash
-cd /home/xuanxuan_awe/GenAI
+cd ./GenAI
 source "$HOME/.elan/env"
-source /home/xuanxuan_awe/miniconda3/etc/profile.d/conda.sh
+source ./miniconda3/etc/profile.d/conda.sh
 conda activate work
-export TAAM_WORK_PKGS=/home/xuanxuan_awe/.local/taam_work_pkgs
+export TAAM_WORK_PKGS=./.local/taam_work_pkgs
 export PYTHONPATH="$TAAM_WORK_PKGS:${PYTHONPATH:-}"
 
 python experiments/upstream_formal_graph/trace_mathlib_subset_with_leandojo.py \
-  --mathlib-root /home/xuanxuan_awe/deps/mathlib4_v420_user \
+  --mathlib-root ./deps/mathlib4_v420_user \
   --include 'Algebra/**/*.lean' \
   --theorem-limit 100 \
   --skip-cache-get \
-  --inventory-jsonl /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_inventory.jsonl \
-  --selected-files-json /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_selected_files.json
+  --inventory-jsonl ./GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_inventory.jsonl \
+  --selected-files-json ./GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_selected_files.json
 ```
 
 What this does:
@@ -130,17 +130,17 @@ Expected output files:
 Use the currently validated inventory-driven graph builder:
 
 ```bash
-cd /home/xuanxuan_awe/GenAI
+cd ./GenAI
 source "$HOME/.elan/env"
-source /home/xuanxuan_awe/miniconda3/etc/profile.d/conda.sh
+source ./miniconda3/etc/profile.d/conda.sh
 conda activate work
-export TAAM_WORK_PKGS=/home/xuanxuan_awe/.local/taam_work_pkgs
+export TAAM_WORK_PKGS=./.local/taam_work_pkgs
 export PYTHONPATH="$TAAM_WORK_PKGS:${PYTHONPATH:-}"
 
 python experiments/upstream_formal_graph/build_mathlib_trace_corpus.py \
-  --traced-repo-root /home/xuanxuan_awe/deps/mathlib4_v420_user \
-  --inventory-jsonl /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_inventory.jsonl \
-  --out-dir /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs \
+  --traced-repo-root ./deps/mathlib4_v420_user \
+  --inventory-jsonl ./GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_inventory.jsonl \
+  --out-dir ./GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs \
   --module-prefix Mathlib.Algebra \
   --limit 100 \
   --max-depth 2 \
@@ -175,7 +175,7 @@ Current validated result in this repository:
 One graph can be passed directly into the current TAAM pipeline:
 
 ```bash
-python run.py --graph-json /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs/vsub_self.graph.json
+python run.py --graph-json ./GenAI/artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs/vsub_self.graph.json
 ```
 
 ## Optional: source-level theorem indexing without LeanDojo tracing
@@ -183,9 +183,9 @@ If you only want a theorem pool first:
 
 ```bash
 python experiments/upstream_formal_graph/index_mathlib_theorems.py \
-  --mathlib-root /home/xuanxuan_awe/deps/mathlib4_v420_user \
+  --mathlib-root ./deps/mathlib4_v420_user \
   --include 'Algebra/**/*.lean' \
-  --out-jsonl /home/xuanxuan_awe/GenAI/artifacts/upstream_formal_graph/mathlib4_algebra_theorems.jsonl
+  --out-jsonl ./GenAI/artifacts/upstream_formal_graph/mathlib4_algebra_theorems.jsonl
 ```
 
 ## Optional: full traced-repo route
@@ -207,8 +207,8 @@ This route is kept for future larger-scale tracing, but the path that has alread
 ## Minimal reproduction checklist
 1. Activate `conda work`.
 2. Load `~/.elan/env`.
-3. Export `PYTHONPATH=/home/xuanxuan_awe/.local/taam_work_pkgs`.
-4. Ensure `/home/xuanxuan_awe/deps/mathlib4_v420_user` exists and `lake exe cache get` has completed.
+3. Export `PYTHONPATH=./.local/taam_work_pkgs`.
+4. Ensure `./deps/mathlib4_v420_user` exists and `lake exe cache get` has completed.
 5. Run `trace_mathlib_subset_with_leandojo.py`.
 6. Run `build_mathlib_trace_corpus.py --no-build-deps`.
 7. Verify `46` graphs under `artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs/`.
