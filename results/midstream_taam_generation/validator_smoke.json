@@ -1,0 +1,8 @@
+{
+  "passed": false,
+  "well_posed": false,
+  "engine": "local_lean_validator",
+  "stdout": "TaamCheck_8afb717050b34ef08241156333f1f42b.lean:1:0: error: expected token\n",
+  "stderr": "",
+  "returncode": 1
+}

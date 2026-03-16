@@ -80,4 +80,11 @@ class HardProblemSample:
     full_lean_problem: str = ""
     proof_completion: str = ""
     proof_source: str = ""
+    source_file_path: str = ""
+    theorem_domain: str = ""
+    source_graph_size: int = 0
+    source_graph_edge_count: int = 0
+    hidden_lemma_count: int = 0
+    visible_lemma_count: int = 0
+    sample_json_path: str = ""
     well_posed: Optional[bool] = None

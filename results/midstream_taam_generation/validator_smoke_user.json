@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "well_posed": true,
+  "engine": "local_lean_validator",
+  "stdout": "",
+  "stderr": "",
+  "returncode": 0
+}

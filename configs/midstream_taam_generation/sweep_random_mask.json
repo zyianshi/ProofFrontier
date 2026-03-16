@@ -1,18 +1,22 @@
-{
-  "name": "demo_sweep_random_mask",
+﻿{
+  "name": "mathlib4_subset_random",
   "graph_json": "",
-  "lean_trace_json": "configs/lean_trace_demo.json",
-  "out_root": "artifacts/midstream_taam_generation/sweeps_random",
+  "graph_manifest_jsonl": "artifacts/upstream_formal_graph/mathlib4_v420_subset/mathlib4_v420_subset_graphs/manifest.jsonl",
+  "graph_dir": "",
+  "graph_glob": "**/*.graph.json",
+  "graph_limit": 0,
+  "lean_trace_json": "",
+  "out_root": "results/midstream_taam_generation/random_sweep",
   "capability_thresholds": [0.0],
   "seeds": [7, 13, 42],
   "solver_type": "deepseek_prover",
   "solver_config": {
-    "command_template": "python tools/run_deepseek_prover.py --lean-file \"{lean_file}\" --out-json \"{result_json}\" --model-id \"deepseek-ai/DeepSeek-Prover-V2-7B\" --device-map \"auto\" --torch-dtype \"auto\" --load-in-4bit --bnb-4bit-compute-dtype \"float16\" --bnb-4bit-quant-type \"nf4\" --bnb-4bit-use-double-quant --max-new-tokens 512 --validator-project-root \"lean_project\"",
-    "timeout_sec": 120
+    "command_template": "python tools/run_deepseek_prover.py --lean-file \"{lean_file}\" --out-json \"{result_json}\" --model-id \"deepseek-ai/DeepSeek-Prover-V2-7B\" --device-map \"auto\" --torch-dtype \"auto\" --load-in-4bit --bnb-4bit-compute-dtype \"float16\" --bnb-4bit-quant-type \"nf4\" --bnb-4bit-use-double-quant --max-new-tokens 512 --validator-project-root \"/home/xuanxuan_awe/deps/mathlib4_v420_user\" --validator-lake-bin \"lake\" --validator-lean-bin \"lean\"",
+    "timeout_sec": 300
   },
   "validation_config": {
     "enabled": true,
-    "command_template": "python tools/run_lean_validator.py --lean-file \"{lean_file}\" --out-json \"{result_json}\" --project-root \"lean_project\"",
+    "command_template": "python tools/run_lean_validator.py --lean-file \"{lean_file}\" --out-json \"{result_json}\" --project-root \"/home/xuanxuan_awe/deps/mathlib4_v420_user\" --lake-bin \"lake\" --lean-bin \"lean\" --disallow-sorry",
     "timeout_sec": 120
   },
   "masking_strategy": "random_mask",

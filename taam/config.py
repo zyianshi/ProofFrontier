@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
@@ -11,7 +11,7 @@ class ExperimentConfig:
     name: str = "default"
     graph_json: str = ""
     lean_trace_json: str = ""
-    out_dir: str = "artifacts/midstream_taam_generation/runs"
+    out_dir: str = "results/midstream_taam_generation/runs"
     capability_threshold: float = 0.0
     seed: int = 7
     solver_type: str = "deepseek_prover"
@@ -25,8 +25,12 @@ class ExperimentConfig:
 class SweepConfig:
     name: str = "sweep"
     graph_json: str = ""
+    graph_dir: str = ""
+    graph_manifest_jsonl: str = ""
+    graph_glob: str = "**/*.graph.json"
+    graph_limit: int = 0
     lean_trace_json: str = ""
-    out_root: str = "artifacts/midstream_taam_generation/sweeps"
+    out_root: str = "results/midstream_taam_generation/sweeps"
     capability_thresholds: List[float] = None
     seeds: List[int] = None
     solver_type: str = "deepseek_prover"
@@ -44,7 +48,7 @@ class SweepConfig:
 
 @dataclass
 class DownstreamDatasetConfig:
-    samples_root: str = "artifacts/midstream_taam_generation/runs"
+    samples_root: str = "results/midstream_taam_generation/runs"
     sample_glob: str = "**/*_hard_sample.json"
     format: str = "rl"
     only_well_posed: bool = True
@@ -60,7 +64,7 @@ class DownstreamTrainingConfig:
     enabled: bool = False
     mode: str = "sft"
     base_model: str = "deepseek-ai/DeepSeek-Prover-V2-7B"
-    output_model_dir: str = "artifacts/downstream_prover_eval/model"
+    output_model_dir: str = "results/downstream_prover_eval/model"
     command_template: str = ""
     timeout_sec: int = 7200
 
@@ -83,19 +87,19 @@ class DownstreamBenchmarkConfig:
 @dataclass
 class DownstreamConfig:
     name: str = "downstream"
-    out_dir: str = "artifacts/downstream_prover_eval"
+    out_dir: str = "results/downstream_prover_eval"
     dataset: DownstreamDatasetConfig = field(default_factory=DownstreamDatasetConfig)
     training: DownstreamTrainingConfig = field(default_factory=DownstreamTrainingConfig)
     benchmark: DownstreamBenchmarkConfig = field(default_factory=DownstreamBenchmarkConfig)
 
 
 def load_experiment_config(path: Path) -> ExperimentConfig:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     return ExperimentConfig(
         name=data.get("name", "default"),
         graph_json=data.get("graph_json", ""),
         lean_trace_json=data.get("lean_trace_json", ""),
-        out_dir=data.get("out_dir", "artifacts/midstream_taam_generation/runs"),
+        out_dir=data.get("out_dir", "results/midstream_taam_generation/runs"),
         capability_threshold=float(data.get("capability_threshold", 0.0)),
         seed=int(data.get("seed", 7)),
         solver_type=data.get("solver_type", "deepseek_prover"),
@@ -107,12 +111,16 @@ def load_experiment_config(path: Path) -> ExperimentConfig:
 
 
 def load_sweep_config(path: Path) -> SweepConfig:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     return SweepConfig(
         name=data.get("name", "sweep"),
         graph_json=data.get("graph_json", ""),
+        graph_dir=data.get("graph_dir", ""),
+        graph_manifest_jsonl=data.get("graph_manifest_jsonl", ""),
+        graph_glob=data.get("graph_glob", "**/*.graph.json"),
+        graph_limit=int(data.get("graph_limit", 0)),
         lean_trace_json=data.get("lean_trace_json", ""),
-        out_root=data.get("out_root", "artifacts/midstream_taam_generation/sweeps"),
+        out_root=data.get("out_root", "results/midstream_taam_generation/sweeps"),
         capability_thresholds=[float(x) for x in data.get("capability_thresholds", [0.0])],
         seeds=[int(x) for x in data.get("seeds", [7, 13, 42])],
         solver_type=data.get("solver_type", "deepseek_prover"),
@@ -124,15 +132,15 @@ def load_sweep_config(path: Path) -> SweepConfig:
 
 
 def load_downstream_config(path: Path) -> DownstreamConfig:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     dataset = data.get("dataset", {})
     training = data.get("training", {})
     benchmark = data.get("benchmark", {})
     return DownstreamConfig(
         name=data.get("name", "downstream"),
-        out_dir=data.get("out_dir", "artifacts/downstream_prover_eval"),
+        out_dir=data.get("out_dir", "results/downstream_prover_eval"),
         dataset=DownstreamDatasetConfig(
-            samples_root=dataset.get("samples_root", "artifacts/midstream_taam_generation/runs"),
+            samples_root=dataset.get("samples_root", "results/midstream_taam_generation/runs"),
             sample_glob=dataset.get("sample_glob", "**/*_hard_sample.json"),
             format=dataset.get("format", "rl"),
             only_well_posed=bool(dataset.get("only_well_posed", True)),
@@ -146,7 +154,7 @@ def load_downstream_config(path: Path) -> DownstreamConfig:
             enabled=bool(training.get("enabled", False)),
             mode=training.get("mode", "sft"),
             base_model=training.get("base_model", "deepseek-ai/DeepSeek-Prover-V2-7B"),
-            output_model_dir=training.get("output_model_dir", "artifacts/downstream_prover_eval/model"),
+            output_model_dir=training.get("output_model_dir", "results/downstream_prover_eval/model"),
             command_template=training.get("command_template", ""),
             timeout_sec=int(training.get("timeout_sec", 7200)),
         ),
