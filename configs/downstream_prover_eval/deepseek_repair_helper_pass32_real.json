@@ -1,0 +1,95 @@
+{
+  "name": "deepseek_repair_helper_pass32_real",
+  "out_dir": "results/downstream_prover_eval/deepseek_repair_helper_pass32_real",
+  "premise_helper": {
+    "inventory_jsonl": "/home/zhengyan/GenAI/artifacts/upstream_formal_graph/mathlib4_v420_algebra_full/mathlib4_v420_algebra_traced_inventory.jsonl",
+    "dataset": {
+      "source_type": "hard_samples",
+      "samples_root": "/home/zhengyan/GenAI/artifacts/ready_for_use/algebra_midstream_ready_20260321/midstream_runs/source_replay_1000_poly_real_resident_gpu0_fresh",
+      "sample_glob": "**/*_hard_sample.json",
+      "format": "helper",
+      "only_well_posed": true,
+      "require_proof_completion": false,
+      "train_ratio": 0.8,
+      "val_ratio": 0.1,
+      "test_ratio": 0.1,
+      "seed": 7
+    },
+    "model_name": "microsoft/codebert-base",
+    "bm25_candidate_count": 32,
+    "rerank_top_n": 8,
+    "hint_top_k": 8,
+    "budget_schedule_candidates": ["24/8", "16/16", "8/24"],
+    "train_num_epochs": 1,
+    "train_batch_size": 8,
+    "eval_batch_size": 8,
+    "learning_rate": 2e-5,
+    "max_length": 512,
+    "seed": 7
+  },
+  "arms": [
+    {
+      "name": "deepseek_vanilla",
+      "mode": "vanilla",
+      "base_model": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "benchmark_model_ref": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "training_enabled": false
+    },
+    {
+      "name": "deepseek_repair_helper_budget32",
+      "mode": "repair_helper_budget32",
+      "base_model": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "benchmark_model_ref": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "training_enabled": true,
+      "training_timeout_sec": 86400,
+      "training_command_template": "python tools/train_premise_helper.py --train-jsonl \"{train_jsonl}\" --eval-jsonl \"{eval_jsonl}\" --test-jsonl \"{test_jsonl}\" --inventory-jsonl \"{inventory_jsonl}\" --output-model-dir \"{output_model_dir}\" --result-json \"{result_json}\" --mode \"{mode}\" --helper-model-name \"{helper_model_name}\" --train-num-epochs {train_num_epochs} --train-batch-size {train_batch_size} --eval-batch-size {eval_batch_size} --learning-rate {learning_rate} --max-length {max_length} --bm25-candidate-count {bm25_candidate_count} --rerank-top-n {rerank_top_n} --hint-top-k {hint_top_k} --seed {seed}",
+      "benchmark_command_template": "python tools/run_repair_augmented_benchmark.py --benchmark-name \"{benchmark_name}\" --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --helper-model-dir \"{helper_model_dir}\" --premise-inventory-jsonl \"{premise_inventory_jsonl}\" --server-url \"{server_url}\" --command-template 'python tools/run_deepseek_prover.py --server-url \"{{server_url}}\" --model-id \"{{model_ref}}\" --lean-file \"{{lean_file}}\" --out-json \"{{result_json}}\" --timeout-sec {{timeout_sec}} --temperature {{temperature}} --top-p {{top_p}} --max-new-tokens {{max_new_tokens}} --seed {{seed}} --validator-project-root \"/home/zhengyan/GenAI/deps/mathlib4_v420_user\" --load-in-4bit --bnb-4bit-compute-dtype float16 --bnb-4bit-quant-type nf4 --bnb-4bit-use-double-quant' --out-json \"{out_json}\" --timeout-sec {timeout_sec} --pass-k {pass_k} --temperature {temperature} --top-p {top_p} --max-new-tokens {max_new_tokens} --seed {seed} --mode \"{mode}\" --budget-schedule \"{budget_schedule}\" --vanilla-attempts {vanilla_attempts} --repair-attempts {repair_attempts} --hint-top-k {hint_top_k}",
+      "compare_to": "deepseek_vanilla"
+    },
+    {
+      "name": "deepseek_repair_helper_extra_budget",
+      "mode": "repair_helper_extra_budget",
+      "base_model": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "benchmark_model_ref": "deepseek-ai/DeepSeek-Prover-V2-7B",
+      "training_enabled": false,
+      "reuse_training_from": "deepseek_repair_helper_budget32",
+      "benchmark_command_template": "python tools/run_repair_augmented_benchmark.py --benchmark-name \"{benchmark_name}\" --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --helper-model-dir \"{helper_model_dir}\" --premise-inventory-jsonl \"{premise_inventory_jsonl}\" --server-url \"{server_url}\" --command-template 'python tools/run_deepseek_prover.py --server-url \"{{server_url}}\" --model-id \"{{model_ref}}\" --lean-file \"{{lean_file}}\" --out-json \"{{result_json}}\" --timeout-sec {{timeout_sec}} --temperature {{temperature}} --top-p {{top_p}} --max-new-tokens {{max_new_tokens}} --seed {{seed}} --validator-project-root \"/home/zhengyan/GenAI/deps/mathlib4_v420_user\" --load-in-4bit --bnb-4bit-compute-dtype float16 --bnb-4bit-quant-type nf4 --bnb-4bit-use-double-quant' --out-json \"{out_json}\" --timeout-sec {timeout_sec} --pass-k {pass_k} --temperature {temperature} --top-p {top_p} --max-new-tokens {max_new_tokens} --seed {seed} --mode \"{mode}\" --budget-schedule \"{budget_schedule}\" --vanilla-attempts {vanilla_attempts} --repair-attempts {repair_attempts} --hint-top-k {hint_top_k}",
+      "compare_to": "deepseek_vanilla"
+    }
+  ],
+  "benchmarks": [
+    {
+      "name": "miniF2F_test",
+      "dataset_name": "miniF2F",
+      "split": "test",
+      "data_path": "/home/zhengyan/GenAI/datasets/minif2f.jsonl",
+      "command_template": "python tools/run_minif2f_benchmark.py --benchmark-name \"{benchmark_name}\" --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --server-url \"{server_url}\" --command-template 'python tools/run_deepseek_prover.py --server-url \"{{server_url}}\" --model-id \"{{model_ref}}\" --lean-file \"{{lean_file}}\" --out-json \"{{result_json}}\" --timeout-sec {{timeout_sec}} --temperature {{temperature}} --top-p {{top_p}} --max-new-tokens {{max_new_tokens}} --seed {{seed}} --validator-project-root \"/home/zhengyan/GenAI/deps/mathlib4_v420_user\" --load-in-4bit --bnb-4bit-compute-dtype float16 --bnb-4bit-quant-type nf4 --bnb-4bit-use-double-quant' --out-json \"{out_json}\" --timeout-sec {timeout_sec} --pass-k {pass_k} --temperature {temperature} --top-p {top_p} --max-new-tokens {max_new_tokens} --seed {seed}",
+      "timeout_sec": 259200,
+      "pass_k": 32,
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "max_new_tokens": 2048,
+      "seed": 7
+    },
+    {
+      "name": "ProofNet_test",
+      "dataset_name": "ProofNet",
+      "split": "test",
+      "data_path": "/home/zhengyan/GenAI/datasets/proofnet.jsonl",
+      "command_template": "python tools/run_minif2f_benchmark.py --benchmark-name \"{benchmark_name}\" --manifest-jsonl \"{manifest_jsonl}\" --split \"{split}\" --model-ref \"{model_ref}\" --server-url \"{server_url}\" --command-template 'python tools/run_deepseek_prover.py --server-url \"{{server_url}}\" --model-id \"{{model_ref}}\" --lean-file \"{{lean_file}}\" --out-json \"{{result_json}}\" --timeout-sec {{timeout_sec}} --temperature {{temperature}} --top-p {{top_p}} --max-new-tokens {{max_new_tokens}} --seed {{seed}} --validator-project-root \"/home/zhengyan/GenAI/deps/mathlib4_v420_user\" --load-in-4bit --bnb-4bit-compute-dtype float16 --bnb-4bit-quant-type nf4 --bnb-4bit-use-double-quant' --out-json \"{out_json}\" --timeout-sec {timeout_sec} --pass-k {pass_k} --temperature {temperature} --top-p {top_p} --max-new-tokens {max_new_tokens} --seed {seed}",
+      "timeout_sec": 259200,
+      "pass_k": 32,
+      "temperature": 1.0,
+      "top_p": 0.95,
+      "max_new_tokens": 2048,
+      "seed": 7
+    }
+  ],
+  "benchmark_runtime": {
+    "host": "127.0.0.1",
+    "port": 18765,
+    "gpu_device": 1,
+    "startup_timeout_sec": 300,
+    "healthcheck_sec": 2
+  }
+}

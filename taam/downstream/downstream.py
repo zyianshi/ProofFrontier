@@ -8,7 +8,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from ..external_tools import run_command_template
+from ..external_tools import materialize_lean_completion, run_command_template
 
 
 def collect_hard_sample_paths(samples_root: Path, sample_glob: str) -> List[Path]:
@@ -28,6 +28,19 @@ def load_hard_samples(samples_root: Path, sample_glob: str) -> List[Dict[str, An
     return samples
 
 
+def load_traced_inventory_rows(inventory_jsonl: Path) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    with inventory_jsonl.open("r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            row["_source_path"] = str(inventory_jsonl)
+            rows.append(row)
+    return rows
+
+
 def _extract_prompt_from_lean_problem(lean_problem: str) -> str:
     if "sorry" not in lean_problem:
         return lean_problem
@@ -38,9 +51,42 @@ def _normalize_completion(completion: str) -> str:
     return completion.strip() + ("\n" if completion.strip() else "")
 
 
+def _split_namespace(theorem_id: str) -> tuple[str, str]:
+    parts = str(theorem_id).strip().split(".")
+    if len(parts) <= 1:
+        return "", theorem_id
+    return ".".join(parts[:-1]), parts[-1]
+
+
+def _safe_ident(name: str) -> str:
+    clean = "".join(ch if (ch.isalnum() or ch == "_") else "_" for ch in str(name))
+    return clean or "replay_theorem"
+
+
+def _build_source_proof_problem(theorem_id: str, theorem_context: Sequence[str], target_statement: str) -> str:
+    lines: List[str] = ["import Mathlib", ""]
+    namespace_name, theorem_tail = _split_namespace(theorem_id)
+    theorem_name = _safe_ident(f"replay_{theorem_tail}")
+    context_chunks = [str(chunk).strip() for chunk in theorem_context if str(chunk).strip()]
+    if namespace_name:
+        lines.append(f"namespace {namespace_name}")
+        lines.append("")
+    signature = " ".join(context_chunks)
+    header = f"theorem {theorem_name}"
+    if signature:
+        header += f" {signature}"
+    header += f" : {target_statement} := by"
+    lines.append(header)
+    lines.append("  sorry")
+    if namespace_name:
+        lines.append("")
+        lines.append(f"end {namespace_name}")
+    return "\n".join(lines)
+
+
 def sample_to_record(sample: Dict[str, Any], dataset_format: str) -> Optional[Dict[str, Any]]:
-    lean_problem = str(sample.get("lean_problem", "")).strip()
-    if not lean_problem:
+    lean_problem = str(sample.get("lean_problem", ""))
+    if not lean_problem.strip():
         return None
 
     record = {
@@ -54,9 +100,12 @@ def sample_to_record(sample: Dict[str, Any], dataset_format: str) -> Optional[Di
         "lean_problem": lean_problem,
         "masked_lean_problem": lean_problem,
         "full_lean_problem": str(sample.get("full_lean_problem", "")).strip(),
+        "proof_completion": str(sample.get("proof_completion", "")).strip(),
         "well_posed": sample.get("well_posed", None),
         "proof_source": sample.get("proof_source", ""),
         "source_path": sample.get("_source_path", ""),
+        "theorem_domain": sample.get("theorem_domain", ""),
+        "source_file_path": sample.get("source_file_path", ""),
     }
 
     fmt = dataset_format.lower().strip()
@@ -74,7 +123,6 @@ def sample_to_record(sample: Dict[str, Any], dataset_format: str) -> Optional[Di
             }
         )
         return record
-
     if fmt == "sft":
         proof_completion = str(sample.get("proof_completion", "")).strip()
         if not proof_completion:
@@ -86,14 +134,89 @@ def sample_to_record(sample: Dict[str, Any], dataset_format: str) -> Optional[Di
                 "completion": _normalize_completion(proof_completion),
                 "ground_truth_proof": _normalize_completion(proof_completion),
                 "supervision_mode": "full_proof_from_original_complete_proof_chain",
-                "ground_truth_definition": (
-                    "The supervision target is the original full proof of the target theorem, "
-                    "while the prompt is the TAAM-masked Lean problem."
-                ),
             }
         )
         return record
+    if fmt == "helper":
+        positives = []
+        for item in [str(sample.get("failed_on", "")).strip(), *[str(x) for x in sample.get("hidden_nodes", [])]]:
+            if item and item not in positives:
+                positives.append(item)
+        negatives = []
+        for item in [str(x) for x in sample.get("visible_nodes", [])]:
+            if item and item not in positives and item not in negatives:
+                negatives.append(item)
+        record.update(
+            {
+                "task_type": "premise_repair",
+                "query": lean_problem,
+                "positive_premises": sorted(positives),
+                "negative_premises": negatives,
+            }
+        )
+        return record
+    raise ValueError(f"Unsupported dataset format: {dataset_format}")
 
+
+def inventory_row_to_record(row: Dict[str, Any], dataset_format: str) -> Optional[Dict[str, Any]]:
+    theorem_id = str(row.get("theorem_id", "")).strip()
+    target_statement = str(row.get("target_statement", "")).strip()
+    proof_completion = str(row.get("tactic_proof", row.get("proof_completion", ""))).strip()
+    theorem_context = list(row.get("theorem_context", []))
+    if not theorem_id or not target_statement:
+        return None
+
+    lean_problem = _build_source_proof_problem(theorem_id, theorem_context, target_statement)
+    record = {
+        "sample_id": theorem_id,
+        "theorem_id": theorem_id,
+        "target_id": theorem_id,
+        "failed_on": "",
+        "hidden_nodes": [],
+        "visible_nodes": [],
+        "masking_strategy": "source_proof",
+        "lean_problem": lean_problem,
+        "masked_lean_problem": lean_problem,
+        "full_lean_problem": materialize_lean_completion(lean_problem, proof_completion) if proof_completion else lean_problem,
+        "proof_completion": proof_completion,
+        "well_posed": True,
+        "proof_source": str(row.get("source", "traced_inventory")),
+        "source_path": str(row.get("_source_path", "")),
+        "source_file_path": str(row.get("file_path", "")),
+    }
+    fmt = dataset_format.lower().strip()
+    if fmt == "sft":
+        if not proof_completion:
+            return None
+        record.update(
+            {
+                "task_type": "lean_proof_completion",
+                "prompt": _extract_prompt_from_lean_problem(lean_problem),
+                "completion": _normalize_completion(proof_completion),
+                "ground_truth_proof": _normalize_completion(proof_completion),
+                "supervision_mode": "full_proof_from_traced_inventory",
+            }
+        )
+        return record
+    if fmt == "helper":
+        record.update(
+            {
+                "task_type": "premise_document",
+                "premise_id": theorem_id,
+                "target_statement": target_statement,
+                "text": f"{theorem_id} : {target_statement}",
+            }
+        )
+        return record
+    if fmt == "rl":
+        record.update(
+            {
+                "task_type": "lean_proof_search",
+                "prompt": lean_problem,
+                "supervision_mode": "policy_optimization_on_source_problem",
+            }
+        )
+        return record
     raise ValueError(f"Unsupported dataset format: {dataset_format}")
 
 
@@ -110,8 +233,8 @@ def build_dataset_records(
         "skipped_not_well_posed": 0,
         "skipped_missing_lean_problem": 0,
         "skipped_missing_proof_completion": 0,
+        "skipped_missing_positive_premises": 0,
     }
-
     for sample in samples:
         if only_well_posed and sample.get("well_posed", None) is not True:
             stats["skipped_not_well_posed"] += 1
@@ -122,16 +245,49 @@ def build_dataset_records(
         if require_proof_completion and not str(sample.get("proof_completion", "")).strip():
             stats["skipped_missing_proof_completion"] += 1
             continue
-
         record = sample_to_record(sample, dataset_format)
         if record is None:
-            if dataset_format.lower().strip() == "sft":
-                stats["skipped_missing_proof_completion"] += 1
-            else:
-                stats["skipped_missing_lean_problem"] += 1
+            stats["skipped_missing_proof_completion"] += 1
+            continue
+        if dataset_format.lower().strip() == "helper" and not record.get("positive_premises"):
+            stats["skipped_missing_positive_premises"] += 1
             continue
         records.append(record)
+    stats["kept_samples"] = len(records)
+    return records, stats
 
+
+def build_inventory_dataset_records(
+    rows: Sequence[Dict[str, Any]],
+    dataset_format: str,
+    require_proof_completion: bool = False,
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    records: List[Dict[str, Any]] = []
+    stats = {
+        "total_samples": len(rows),
+        "kept_samples": 0,
+        "skipped_missing_target_statement": 0,
+        "skipped_missing_proof_completion": 0,
+        "skipped_missing_theorem_id": 0,
+    }
+    for row in rows:
+        theorem_id = str(row.get("theorem_id", "")).strip()
+        target_statement = str(row.get("target_statement", "")).strip()
+        proof_completion = str(row.get("tactic_proof", row.get("proof_completion", ""))).strip()
+        if not theorem_id:
+            stats["skipped_missing_theorem_id"] += 1
+            continue
+        if not target_statement:
+            stats["skipped_missing_target_statement"] += 1
+            continue
+        if require_proof_completion and not proof_completion:
+            stats["skipped_missing_proof_completion"] += 1
+            continue
+        record = inventory_row_to_record(row, dataset_format)
+        if record is None:
+            stats["skipped_missing_proof_completion"] += 1
+            continue
+        records.append(record)
     stats["kept_samples"] = len(records)
     return records, stats
 
@@ -146,17 +302,17 @@ def split_records(
     total_ratio = train_ratio + val_ratio + test_ratio
     if total_ratio <= 0:
         raise ValueError("train_ratio + val_ratio + test_ratio must be > 0")
-
     normalized = [train_ratio / total_ratio, val_ratio / total_ratio, test_ratio / total_ratio]
     data = list(records)
     random.Random(seed).shuffle(data)
     n = len(data)
     n_train = int(n * normalized[0])
     n_val = int(n * normalized[1])
-    train = data[:n_train]
-    val = data[n_train : n_train + n_val]
-    test = data[n_train + n_val :]
-    return {"train": train, "val": val, "test": test}
+    return {
+        "train": data[:n_train],
+        "val": data[n_train : n_train + n_val],
+        "test": data[n_train + n_val :],
+    }
 
 
 def write_jsonl(records: Iterable[Dict[str, Any]], path: Path) -> None:
@@ -167,8 +323,10 @@ def write_jsonl(records: Iterable[Dict[str, Any]], path: Path) -> None:
 
 
 def export_dataset_bundle(
+    source_type: str,
     samples_root: Path,
     sample_glob: str,
+    inventory_jsonl: Path,
     out_dir: Path,
     dataset_format: str,
     only_well_posed: bool,
@@ -178,33 +336,43 @@ def export_dataset_bundle(
     test_ratio: float,
     seed: int,
 ) -> Dict[str, Any]:
-    samples = load_hard_samples(samples_root, sample_glob)
-    records, stats = build_dataset_records(
-        samples,
-        dataset_format=dataset_format,
-        only_well_posed=only_well_posed,
-        require_proof_completion=require_proof_completion,
-    )
+    if source_type == "hard_samples":
+        samples = load_hard_samples(samples_root, sample_glob)
+        records, stats = build_dataset_records(
+            samples,
+            dataset_format=dataset_format,
+            only_well_posed=only_well_posed,
+            require_proof_completion=require_proof_completion,
+        )
+    elif source_type == "traced_inventory":
+        rows = load_traced_inventory_rows(inventory_jsonl)
+        records, stats = build_inventory_dataset_records(
+            rows,
+            dataset_format=dataset_format,
+            require_proof_completion=require_proof_completion,
+        )
+    else:
+        raise ValueError(f"Unsupported downstream dataset source_type: {source_type}")
+
     splits = split_records(records, train_ratio=train_ratio, val_ratio=val_ratio, test_ratio=test_ratio, seed=seed)
     out_dir.mkdir(parents=True, exist_ok=True)
-
     split_paths: Dict[str, str] = {}
-    for split_name, split_records_list in splits.items():
+    for split_name, split_rows in splits.items():
         split_path = out_dir / f"{split_name}.jsonl"
-        write_jsonl(split_records_list, split_path)
+        write_jsonl(split_rows, split_path)
         split_paths[split_name] = str(split_path)
-
     manifest = {
+        "source_type": source_type,
         "dataset_format": dataset_format,
         "samples_root": str(samples_root),
         "sample_glob": sample_glob,
+        "inventory_jsonl": str(inventory_jsonl),
         "seed": seed,
         "split_paths": split_paths,
         "split_sizes": {k: len(v) for k, v in splits.items()},
         "stats": stats,
     }
-    manifest_path = out_dir / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    (out_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     return manifest
 
 
@@ -276,36 +444,30 @@ def summarize_benchmark_rows(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
         "pass_rate": (successes / total) if total else 0.0,
         "by_split": {
             split: {
-                "tasks": len(vals),
-                "successes": sum(1 for v in vals if v),
-                "pass_rate": (sum(1 for v in vals if v) / len(vals)) if vals else 0.0,
+                "tasks": len(values),
+                "successes": sum(1 for value in values if value),
+                "pass_rate": (sum(1 for value in values if value) / len(values)) if values else 0.0,
             }
-            for split, vals in sorted(by_split.items())
+            for split, values in sorted(by_split.items())
         },
     }
 
 
-def compare_benchmark_runs(
-    before_rows: Sequence[Dict[str, Any]],
-    after_rows: Sequence[Dict[str, Any]],
-) -> Dict[str, Any]:
+def compare_benchmark_runs(before_rows: Sequence[Dict[str, Any]], after_rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
     before_map = {_row_id(row): row for row in before_rows}
     after_map = {_row_id(row): row for row in after_rows}
     shared_ids = sorted(set(before_map) & set(after_map))
     if not shared_ids:
         raise ValueError("No overlapping task ids between before/after benchmark results")
 
-    paired = []
     improvements = 0
     regressions = 0
     unchanged = 0
     split_buckets: Dict[str, List[Tuple[bool, bool]]] = defaultdict(list)
-
     for task_id in shared_ids:
         before_ok = _row_success(before_map[task_id])
         after_ok = _row_success(after_map[task_id])
         split_name = _row_split(after_map[task_id] if _row_split(after_map[task_id]) != "all" else before_map[task_id])
-        paired.append({"task_id": task_id, "before": before_ok, "after": after_ok, "split": split_name})
         split_buckets[split_name].append((before_ok, after_ok))
         if (not before_ok) and after_ok:
             improvements += 1
@@ -318,21 +480,6 @@ def compare_benchmark_runs(
     after_summary = summarize_benchmark_rows([after_map[task_id] for task_id in shared_ids])
     error_before = 1.0 - before_summary["pass_rate"]
     error_after = 1.0 - after_summary["pass_rate"]
-
-    split_stats = []
-    for split_name, values in sorted(split_buckets.items()):
-        before_pass = mean(1.0 if before else 0.0 for before, _ in values) if values else 0.0
-        after_pass = mean(1.0 if after else 0.0 for _, after in values) if values else 0.0
-        split_stats.append(
-            {
-                "split": split_name,
-                "tasks": len(values),
-                "before_pass_rate": before_pass,
-                "after_pass_rate": after_pass,
-                "absolute_gain": after_pass - before_pass,
-            }
-        )
-
     return {
         "matched_tasks": len(shared_ids),
         "before": before_summary,
@@ -349,15 +496,10 @@ def compare_benchmark_runs(
         "unchanged_tasks": unchanged,
         "win_rate": improvements / len(shared_ids),
         "regression_rate": regressions / len(shared_ids),
-        "split_stats": split_stats,
     }
 
 
-def run_training_job(
-    command_template: str,
-    placeholders: Dict[str, str],
-    timeout_sec: int,
-) -> Dict[str, Any]:
+def run_training_job(command_template: str, placeholders: Dict[str, str], timeout_sec: int) -> Dict[str, Any]:
     proc = run_command_template(command_template, placeholders, timeout_sec=timeout_sec)
     return {
         "returncode": proc.returncode,
@@ -367,11 +509,7 @@ def run_training_job(
     }
 
 
-def run_benchmark_job(
-    command_template: str,
-    placeholders: Dict[str, str],
-    timeout_sec: int,
-) -> Dict[str, Any]:
+def run_benchmark_job(command_template: str, placeholders: Dict[str, str], timeout_sec: int) -> Dict[str, Any]:
     proc = run_command_template(command_template, placeholders, timeout_sec=timeout_sec)
     return {
         "returncode": proc.returncode,

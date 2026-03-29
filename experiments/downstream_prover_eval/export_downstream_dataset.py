@@ -18,8 +18,10 @@ def main() -> None:
     parser.add_argument("--config", type=str, default="", help="Downstream config JSON")
     parser.add_argument("--samples-root", type=str, default="", help="Folder containing hard sample JSON files")
     parser.add_argument("--sample-glob", type=str, default="**/*_hard_sample.json")
+    parser.add_argument("--source-type", type=str, default="hard_samples", help="hard_samples | traced_inventory")
+    parser.add_argument("--inventory-jsonl", type=str, default="", help="Traced inventory JSONL for source_type=traced_inventory")
     parser.add_argument("--out-dir", type=str, default="artifacts/downstream_prover_eval/export_bundle")
-    parser.add_argument("--format", type=str, default="rl", help="rl | sft")
+    parser.add_argument("--format", type=str, default="rl", help="rl | sft | helper")
     parser.add_argument("--only-well-posed", action="store_true", default=False)
     parser.add_argument("--require-proof-completion", action="store_true", default=False)
     parser.add_argument("--train-ratio", type=float, default=0.8)
@@ -30,10 +32,18 @@ def main() -> None:
 
     if args.config:
         cfg = load_downstream_config(Path(args.config))
-        dataset_cfg = cfg.dataset
+        requested_format = (args.format or "").strip().lower()
+        if requested_format == "helper":
+            dataset_cfg = cfg.premise_helper.dataset
+            inventory_jsonl = cfg.premise_helper.inventory_jsonl or dataset_cfg.inventory_jsonl
+            out_dir = Path(cfg.out_dir) / "datasets" / "premise_helper"
+        else:
+            dataset_cfg = cfg.dataset
+            inventory_jsonl = dataset_cfg.inventory_jsonl
+            out_dir = Path(cfg.out_dir) / "dataset"
+        source_type = dataset_cfg.source_type
         samples_root = Path(dataset_cfg.samples_root)
         sample_glob = dataset_cfg.sample_glob
-        out_dir = Path(cfg.out_dir) / "dataset"
         dataset_format = dataset_cfg.format
         only_well_posed = dataset_cfg.only_well_posed
         require_proof_completion = dataset_cfg.require_proof_completion
@@ -42,8 +52,10 @@ def main() -> None:
         test_ratio = dataset_cfg.test_ratio
         seed = dataset_cfg.seed
     else:
+        source_type = args.source_type
         samples_root = Path(args.samples_root or "artifacts/midstream_taam_generation/runs")
         sample_glob = args.sample_glob
+        inventory_jsonl = args.inventory_jsonl
         out_dir = Path(args.out_dir)
         dataset_format = args.format
         only_well_posed = bool(args.only_well_posed)
@@ -54,8 +66,10 @@ def main() -> None:
         seed = args.seed
 
     manifest = export_dataset_bundle(
+        source_type=source_type,
         samples_root=samples_root,
         sample_glob=sample_glob,
+        inventory_jsonl=Path(inventory_jsonl),
         out_dir=out_dir,
         dataset_format=dataset_format,
         only_well_posed=only_well_posed,
